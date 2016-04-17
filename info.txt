@@ -1,0 +1,30 @@
+Desert map with rock mountains (hardness 700) and softer sand zones (hardness 175). On rocks tanks/bots have a sightly higher speed (tanks:+20%,bots:+10%). Symmetric; 4v4,3v3,2v2, 8 start positions. Metal, wind and feature values can be set in map options as well as the time of day.
+
+Size: 14x12
+Players: 2v2, 3v3, 4v4 (8 start positions)
+
+Changelog:
+v4.1: 
+-new metal distribution (more spread than v4.0)
+-removed one geovent per side, so now 3 per side
+v4.0: 
+-new metal distribution (more spread to drive players out of base)
+-added geovents (4 per side)
+-improved mapoptions info widget (movable, closable, not in ZK)
+V3.1:
+-only name/version number changed, update due to problems with autohosts
+V3.0: 
+-Now really symmetric (new heightmap)
+-new texture and heightmap; new splat details/spec map
+-Normal setting: much less reclaimable metal and energy (1/5)
+-some more metal spots
+-switched from smd to map blueprint container
+-partly new features
+-map options for metal, wind, feature values, time of day
+-widget to show map options before game start
+
+V02: first playable release
+V01: never released
+
+Used Tools:
+Inkscape (rough draft), Krita (heightmap), SpringMapEdit (basic texturing), Spring Feature Placer, Gimp (everything else)

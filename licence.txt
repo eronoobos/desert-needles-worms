@@ -1,0 +1,4 @@
+Licence:
+scripts GPL 2.0
+map CC BY 3.0
+features CC 3.0 BY-SA

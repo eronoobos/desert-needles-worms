@@ -1,0 +1,7 @@
+Credits:
+Based on offical map blueprint container by jK.
+Skyboxes and some splat detail texes from smoth and Beherith.
+Features by smoth and 0ad from Spring Features 1.0 pack by Forboding Angel (models are included in map -> no dependency; to avoid problems with auto-downloading).
+
+
+ 
