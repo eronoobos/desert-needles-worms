@@ -4,10 +4,10 @@
 --
 
 local mapinfo = {
-	name        = "Desert Needle Small With Worms",
-	shortname   = "DNSWW41",
-	description = "Desert map with soft sand and hard rocks. 2v2 to 4v4, 8 start positions. On rocks tanks/bots have a slightly higher speed (tanks:+20%,bots:+10%). Map options for metal, wind, feature values, time of day. Credits: Based on offical map blueprint container by jK; Skyboxes and some splat detail texes from smoth and Beherith; Features by smoth and 0ad from Spring Features 1.0 pack. Licence: Scripts GPL 2.0, map CC BY 3.0, features CC 3.0 BY-SA. Worms by eronoobos.",
-	author      = "qray & eronoobos",
+	name        = "Worm-Ridden Desert Needle Small",
+	shortname   = "WRDNS41",
+	description = "Desert map with soft sand and hard rocks, and unit-eating worms. 2v2 to 4v4, 8 start positions. On rocks tanks/bots have a slightly higher speed (tanks:+20%,bots:+10%). Map options for metal, wind, feature values, time of day, worm aggression and speed. Credits: Based on offical map blueprint container by jK; Skyboxes and some splat detail texes from smoth and Beherith; Features by smoth and 0ad from Spring Features 1.0 pack. Licence: Scripts GPL 2.0, map CC BY 3.0, features CC 3.0 BY-SA. Worms by eronoobos.",
+	author      = "qray, eronoobos",
 	version     = "4.1",
 	--mutator   = "deployment";
 	--mapfile   = "", --// location of smf/sm3 file (optional)
