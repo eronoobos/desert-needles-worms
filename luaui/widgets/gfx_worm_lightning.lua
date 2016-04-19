@@ -10,12 +10,14 @@ function widget:GetInfo()
 	}
 end
 
-local strikeDuration = 30 -- in seconds
-local flashDuration = 30
+local strikeDuration = 0.15 -- in seconds
+local flashDuration = 0.2
 local flashTex = "bitmaps/sworm_lightning_glow.png"
 local flashSizeMult = 4
 
 local strikes = {}
+
+local lastX1, lastZ1, lastX2, lastZ2
 
 local tRemove = table.remove
 local mAtan2 = math.atan2
@@ -42,6 +44,8 @@ local spGetGroundHeight = Spring.GetGroundHeight
 local spWorldToScreenCoords = Spring.WorldToScreenCoords
 local spIsAABBInView = Spring.IsAABBInView
 local spIsSphereInView = Spring.IsSphereInView
+local spGetLocalTeamID = Spring.GetLocalTeamID
+local spGetTeamRulesParam = Spring.GetTeamRulesParam
 
 local glCreateList = gl.CreateList
 local glCallList = gl.CallList
@@ -106,52 +110,6 @@ local function doPoints2d(x, y)
 	glVertex(x, y)
 end
 
-local function doHalfPyramid(x1, y1, z1, x2, y2, z2, width)
-	glVertex(x1, y1, z1)
-	local vx, vy, vz, dist = normalizeVector3d(x2-x1, y2-y1, z2-z1)
-	local halfDist = dist/2
-	glRotate(90, vx, vy, vz)
-	glVertex(width, halfDist, width)
-	glRotate(90, vx, vy, vz)
-	glVertex(width, halfDist, width)
-	glRotate(90, vx, vy, vz)
-	glVertex(width, halfDist, width)
-	glRotate(90, vx, vy, vz)
-	glVertex(width, halfDist, width)
-end
-
--- local function DrawCylinder(r, h, p)
---     local theta1 = 0;
---     local ex,ey,ez = 0,0,0;
---     local px,py,pz = 0,0,0;
-
---     glBeginEnd( GL_TRIANGLE_STRIP , function()
---     for i = 0,p do
---         theta1 = i * TWOPI / p;
---                 ex = sin(theta1);
---                 ez = cos(theta1);
---                 px = cx + r * ex;
---                 py = cy;
---                 pz = cz + r * ez;
---                 -- glNormal( ex, 1, ez );
---                 -- glTexCoord( i/p , 0 );
---                 glVertex( px, py, pz );
---                 py = cy + h;
---                 -- glTexCoord( i/p, 1 );
---                 glVertex( px, py, pz );
---     end
---     end)
--- end
-
-local function doRotationalCylinder(r, h, p)
-	local rot = 360 / p
-	for i = 0, p do
-		glVertex(r, 0, 0)
-		glVertex(r, h, 0)
-		if i ~= p then glRotate(i*rot, 0, 1, 0) end
-	end
-end
-
 local function doCylinder(r, h, p)
 	local rot = twicePi / p
 	local pos = {}
@@ -186,31 +144,11 @@ local function drawSegment(x1, y1, z1, x2, y2, z2, r)
 	local zAxisAngle = mDeg(mAtan2(-distXZ, dy))
 	glRotate(zAxisAngle, 0, 0, 1)
 	local dist = mSqrt(dx*dx + dy*dy + dz*dz)
-	glBeginEnd(GL_TRIANGLE_STRIP, doCylinder, r, dist, 3)
+	glBeginEnd(GL_TRIANGLE_STRIP, doCylinder, r, dist+(r/2), 3)
 	-- glLineWidth(2)
 	-- glColor(1, 0, 0, 1)
 	-- glBeginEnd(GL_LINE_STRIP, doLine3d, 0, 0, 0, 0, dist, 0)
 	glPopMatrix()
-end
-
-local function pixelsPerElmoHere(x, y, z, elmos)
-	elmos = elmos or 10
-	local maxDistSq = 0
-	local sx1, sy1 = spWorldToScreenCoords(s.x, s.y, s.z)
-	for dx = -elmos, elmos, elmos do
-		for dy = -elmos, elmos, elmos do
-			for dz = -elmos, elmos, elmos do
-				local sx2, sy2 = spWorldToScreenCoords(s.x, s.y, s.z)
-				local distx = sx2 - sx1
-				local disty = sy2 - sy1
-				local distSq = (distx*distx) + (disty*disty)
-				if distSq > maxDistSq then
-					maxDistSq = distSq
-				end
-			end
-		end
-	end
-	return mSqrt(maxDistSq)/elmos
 end
 
 local function drawLightningDisplayList(segments, coreColor, glowColor, thickness, glowThickness)
@@ -218,7 +156,8 @@ local function drawLightningDisplayList(segments, coreColor, glowColor, thicknes
 	glowThickness = glowThickness or 3
 	for i = 1, #segments do
 		local seg = segments[i]
-		glBlending("add")
+		-- glBlending("add")
+		glBlending("alpha_add")
 		glColor(glowColor)
 		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, glowThickness)
 		-- glBlending("add")
@@ -284,13 +223,10 @@ local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, bran
 	local segments, y1, y2 = getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	local first = segments[1].init
 	local last = segments[#segments].term
-	local coreColor = { 1, 1, 1, 1 }
 	local r = mRandom()
-	local glowColor = { 0.5+(r*0.5), 0, 0.5+((1-r)*0.5), 0.05 }
-	local fr = (coreColor[1] + glowColor[1]) / 2
-	local fg = (coreColor[2] + glowColor[2]) / 2
-	local fb = (coreColor[3] + glowColor[3]) / 2
-	local flashColor = {fr, fg, fb, 0.15}
+	local coreColor = { 0.5+(r*0.5), 0.5, 0.5+((1-r)*0.5), 1 }
+	local glowColor = { coreColor[1], 0, coreColor[3], 0.1 }
+	local flashColor = { coreColor[1], coreColor[2], coreColor[3], 0.15}
 	local radius = mMax( mAbs(x2-x1), mAbs(y2-y1), mAbs(z2-z1) ) / 2
 	local strike = {
 		x = (x1+x2) / 2,
@@ -311,6 +247,18 @@ end
 
 function widget:Initialize()
 	widgetHandler:RegisterGlobal("passWormLightning", passWormLightning)
+end
+
+function widget:GameFrame(gf)
+	local myTeamID = spGetLocalTeamID()
+	local x1 = spGetTeamRulesParam(myTeamID, "wormLightningX1")
+	local z1 = spGetTeamRulesParam(myTeamID, "wormLightningZ1")
+	local x2 = spGetTeamRulesParam(myTeamID, "wormLightningX2")
+	local z2 = spGetTeamRulesParam(myTeamID, "wormLightningZ2")
+	if x1 ~= lastX1 or z1 ~= lastZ1 or x2 ~= lastX2 or z2 ~= lastZ2 then
+		passWormLightning(x1, z1, x2, z2)
+	end
+	lastX1, lastZ1, lastX2, lastZ2 = x1, z1, x2, z2
 end
 
 function widget:Update(dt)

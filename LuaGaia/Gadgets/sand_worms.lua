@@ -147,6 +147,9 @@ local spSetUnitNoDraw = Spring.SetUnitNoDraw
 local spSetUnitNoMinimap = Spring.SetUnitNoMinimap
 local spSetUnitNoSelect = Spring.SetUnitNoSelect
 local spGetUnitSeparation = Spring.GetUnitSeparation
+local spGetTeamList = Spring.GetTeamList
+local spIsPosInLos = Spring.IsPosInLos
+local spSetTeamRulesParam = Spring.SetTeamRulesParam
 
 -- localizations that must be set in Initialize
 local spMoveCtrlEnable
@@ -653,7 +656,21 @@ local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
 end
 
 local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
-	SendToUnsynced("passWormLightning", x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
+	local allyList = spGetAllyTeamList()
+	local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
+	for k, aID in pairs(allyList) do
+		if spIsPosInLos(x1, y1, z1, aID) or spIsPosInLos(x2, y2, z2, aID) then
+			local teamList = spGetTeamList(aID)
+			for t = 1, #teamList do
+				local teamID = teamList[t]
+				spSetTeamRulesParam(teamID, "wormLightningX1", x1)
+				spSetTeamRulesParam(teamID, "wormLightningZ1", z1)
+				spSetTeamRulesParam(teamID, "wormLightningX2", x2)
+				spSetTeamRulesParam(teamID, "wormLightningZ2", z2)
+			end
+		end
+	end
+	-- SendToUnsynced("passWormLightning", x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
 	-- offsetMult = offsetMult or 0.4
 	-- generationNum = generationNum or 5
 	-- branchProb = branchProb or 0.2
