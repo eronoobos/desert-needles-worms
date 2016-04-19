@@ -10,8 +10,8 @@ function widget:GetInfo()
 	}
 end
 
-local strikeDuration = 0.1 -- in seconds
-local flashDuration = 0.15
+local strikeDuration = 30 -- in seconds
+local flashDuration = 30
 local flashTex = "bitmaps/sworm_lightning_glow.png"
 local flashSizeMult = 4
 
@@ -26,6 +26,7 @@ local mMin = math.min
 local mMax = math.max
 local mSqrt = math.sqrt
 local mAbs = math.abs
+local mDeg = math.deg
 
 local pi = math.pi
 local twicePi = math.pi * 2
@@ -57,14 +58,24 @@ local glTexture = gl.Texture
 local glBlending = gl.Blending
 local glBillboard = gl.Billboard
 local glTranslate = gl.Translate
+local glNormal = gl.Normal
+local glRotate = gl.Rotate
 
 local GL_LINE_STRIP = GL.LINE_STRIP
+local GL_TRIANGLE_STRIP = GL.TRIANGLE_STRIP
 local GL_POINTS = GL.POINTS
+local GL_TRIANGLE_FAN = GL.TRIANGLE_FAN
 
 local function normalizeVector2d(vx, vy)
 	if vx == 0 and vy == 0 then return 0, 0 end
 	local dist = mSqrt(vx*vx + vy*vy)
 	return vx/dist, vy/dist, dist
+end
+
+local function normalizeVector3d(vx, vy, vz)
+	if vx == 0 and vy == 0 and vz == 0 then return 0, 0, 0 end
+	local dist = mSqrt(vx*vx + vy*vy + vz*vz)
+	return vx/dist, vy/dist, vz/dist, dist
 end
 
 local function perpendicularVector2d(vx, vz)
@@ -95,6 +106,93 @@ local function doPoints2d(x, y)
 	glVertex(x, y)
 end
 
+local function doHalfPyramid(x1, y1, z1, x2, y2, z2, width)
+	glVertex(x1, y1, z1)
+	local vx, vy, vz, dist = normalizeVector3d(x2-x1, y2-y1, z2-z1)
+	local halfDist = dist/2
+	glRotate(90, vx, vy, vz)
+	glVertex(width, halfDist, width)
+	glRotate(90, vx, vy, vz)
+	glVertex(width, halfDist, width)
+	glRotate(90, vx, vy, vz)
+	glVertex(width, halfDist, width)
+	glRotate(90, vx, vy, vz)
+	glVertex(width, halfDist, width)
+end
+
+-- local function DrawCylinder(r, h, p)
+--     local theta1 = 0;
+--     local ex,ey,ez = 0,0,0;
+--     local px,py,pz = 0,0,0;
+
+--     glBeginEnd( GL_TRIANGLE_STRIP , function()
+--     for i = 0,p do
+--         theta1 = i * TWOPI / p;
+--                 ex = sin(theta1);
+--                 ez = cos(theta1);
+--                 px = cx + r * ex;
+--                 py = cy;
+--                 pz = cz + r * ez;
+--                 -- glNormal( ex, 1, ez );
+--                 -- glTexCoord( i/p , 0 );
+--                 glVertex( px, py, pz );
+--                 py = cy + h;
+--                 -- glTexCoord( i/p, 1 );
+--                 glVertex( px, py, pz );
+--     end
+--     end)
+-- end
+
+local function doRotationalCylinder(r, h, p)
+	local rot = 360 / p
+	for i = 0, p do
+		glVertex(r, 0, 0)
+		glVertex(r, h, 0)
+		if i ~= p then glRotate(i*rot, 0, 1, 0) end
+	end
+end
+
+local function doCylinder(r, h, p)
+	local rot = twicePi / p
+	local pos = {}
+	for a = 0, twicePi, rot do
+		local x, z = CirclePos(0, 0, r, a)
+		pos[#pos+1] = {x=x, z=z}
+		if a ~= 0 then
+			glVertex(x, 0, z)
+		end
+	end
+	for i = 1, #pos do
+		local p = pos[i]
+		glVertex(p.x, 0, p.z)
+		glVertex(p.x, h, p.z)
+	end
+	for i = 2, #pos do
+		local p = pos[i]
+		glVertex(p.x, h, p.z)
+	end
+end
+
+local function drawSegment(x1, y1, z1, x2, y2, z2, r)
+	glPushMatrix()
+	-- glLineWidth(4)
+	-- glColor(0, 0, 1, 1)
+	-- glBeginEnd(GL_LINE_STRIP, doLine3d, x1, y1, z1, x2, y2, z2)
+	glTranslate(x1, y1, z1)
+	local dx, dy, dz = x2-x1, y2-y1, z2-z1
+	local yAxisAngle = mDeg(mAtan2(-dz, dx))
+	glRotate(yAxisAngle, 0, 1, 0)
+	local distXZ = mSqrt(dx*dx + dz*dz)
+	local zAxisAngle = mDeg(mAtan2(-distXZ, dy))
+	glRotate(zAxisAngle, 0, 0, 1)
+	local dist = mSqrt(dx*dx + dy*dy + dz*dz)
+	glBeginEnd(GL_TRIANGLE_STRIP, doCylinder, r, dist, 3)
+	-- glLineWidth(2)
+	-- glColor(1, 0, 0, 1)
+	-- glBeginEnd(GL_LINE_STRIP, doLine3d, 0, 0, 0, 0, dist, 0)
+	glPopMatrix()
+end
+
 local function pixelsPerElmoHere(x, y, z, elmos)
 	elmos = elmos or 10
 	local maxDistSq = 0
@@ -116,18 +214,17 @@ local function pixelsPerElmoHere(x, y, z, elmos)
 end
 
 local function drawLightningDisplayList(segments, coreColor, glowColor, thickness, glowThickness)
-	thickness = thickness or 2
-	glowThickness = glowThickness or 7
+	thickness = thickness or 0.75
+	glowThickness = glowThickness or 3
 	for i = 1, #segments do
 		local seg = segments[i]
-		glBlending("alpha_add")
+		glBlending("add")
 		glColor(glowColor)
-		glLineWidth(glowThickness)
-		glBeginEnd(GL_LINE_STRIP, doLine3d, seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z)
-		glBlending("reset")
+		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, glowThickness)
+		-- glBlending("add")
 		glColor(coreColor)
-		glLineWidth(thickness)
-		glBeginEnd(GL_LINE_STRIP, doLine3d, seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z)
+		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, thickness)
+		glBlending("reset")
 	end
 end
 
@@ -189,7 +286,7 @@ local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, bran
 	local last = segments[#segments].term
 	local coreColor = { 1, 1, 1, 1 }
 	local r = mRandom()
-	local glowColor = { 0.5+(r*0.5), 0, 0.5+((1-r)*0.5), 0.2 }
+	local glowColor = { 0.5+(r*0.5), 0, 0.5+((1-r)*0.5), 0.05 }
 	local fr = (coreColor[1] + glowColor[1]) / 2
 	local fg = (coreColor[2] + glowColor[2]) / 2
 	local fb = (coreColor[3] + glowColor[3]) / 2
@@ -234,14 +331,14 @@ end
 function widget:DrawWorld()
 	if #strikes == 0 then return end
 	glDepthTest(true)
-	glPushMatrix()
+	-- glPushMatrix()
 	for i = 1, #strikes do
 		local s = strikes[i]
 		if not s.noStrike then
 			glCallList(s.displayList)
 		end
 	end
-	glPopMatrix()
+	-- glPopMatrix()
 	glDepthTest(false)
 	for i = 1, #strikes do
 		local s = strikes[i]
