@@ -653,46 +653,47 @@ local function drawCegLine(x1, y1, z1, x2, y2, z2, ceg, spacing)
 end
 
 local function signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
-	offsetMult = offsetMult or 0.4
-	generationNum = generationNum or 5
-	branchProb = branchProb or 0.2
-	lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
-	flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
-	minOffsetMultXZ = minOffsetXZ or 0.05
-	minOffsetMultY = minOffsetY or 0.1
-	local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
-	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}} }
-	for g = 1, generationNum do
-		local newSegmentList = {}
-		for s = #segmentList, 1, -1 do
-			local seg = tRemove(segmentList, s)
-			local midX = (seg.init.x + seg.term.x) / 2
-			local midY = (seg.init.y + seg.term.y) / 2
-			local midZ = (seg.init.z + seg.term.z) / 2
-			local vx, vz, dist = normalizeVector2d(seg.term.x-seg.init.x, seg.term.z-seg.init.z)
-			local pvx, pvz = perpendicularVector2d(vx, vz)
-			local offMax = dist * offsetMult
-			local offsetXZ = mRandom(dist*minOffsetMultXZ, dist*offsetMult)
-			midX, midZ = midX+(pvx*offsetXZ), midZ+(pvz*offsetXZ)
-			midY = mMax( spGetGroundHeight(midX,midZ), midY+mRandom(dist*minOffsetMultY,offMax) )
-			local mid = {x=midX, y=midY, z=midZ}
-			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid}
-			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term}
-			if mRandom() < branchProb then
-				local angle = mAtan2(vz, vx)
-				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
-				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist*0.35, angle)
-				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz} }
-			end
-		end
-		segmentList = newSegmentList
-	end
-	for i = 1, #segmentList do
-		local seg = segmentList[i]
-		drawCegLine(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, lightningCeg)
-	end
-	spSpawnCEG(flashCeg,x1,y1,z1,0,1,0,2,0)
-	spSpawnCEG(flashCeg,x2,y2,z2,0,1,0,2,0)
+	SendToUnsynced("passWormLightning", x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
+	-- offsetMult = offsetMult or 0.4
+	-- generationNum = generationNum or 5
+	-- branchProb = branchProb or 0.2
+	-- lightningCeg = lightningCeg or "WORMSIGN_LIGHTNING_SMALL"
+	-- flashCeg = flashCeg or "WORMSIGN_FLASH_SMALL"
+	-- minOffsetMultXZ = minOffsetXZ or 0.05
+	-- minOffsetMultY = minOffsetY or 0.1
+	-- local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
+	-- local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}} }
+	-- for g = 1, generationNum do
+	-- 	local newSegmentList = {}
+	-- 	for s = #segmentList, 1, -1 do
+	-- 		local seg = tRemove(segmentList, s)
+	-- 		local midX = (seg.init.x + seg.term.x) / 2
+	-- 		local midY = (seg.init.y + seg.term.y) / 2
+	-- 		local midZ = (seg.init.z + seg.term.z) / 2
+	-- 		local vx, vz, dist = normalizeVector2d(seg.term.x-seg.init.x, seg.term.z-seg.init.z)
+	-- 		local pvx, pvz = perpendicularVector2d(vx, vz)
+	-- 		local offMax = dist * offsetMult
+	-- 		local offsetXZ = mRandom(dist*minOffsetMultXZ, dist*offsetMult)
+	-- 		midX, midZ = midX+(pvx*offsetXZ), midZ+(pvz*offsetXZ)
+	-- 		midY = mMax( spGetGroundHeight(midX,midZ), midY+mRandom(dist*minOffsetMultY,offMax) )
+	-- 		local mid = {x=midX, y=midY, z=midZ}
+	-- 		newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid}
+	-- 		newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term}
+	-- 		if mRandom() < branchProb then
+	-- 			local angle = mAtan2(vz, vx)
+	-- 			angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
+	-- 			local bx, bz = CirclePos(seg.init.x, seg.init.z, dist*0.35, angle)
+	-- 			newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz} }
+	-- 		end
+	-- 	end
+	-- 	segmentList = newSegmentList
+	-- end
+	-- for i = 1, #segmentList do
+	-- 	local seg = segmentList[i]
+	-- 	drawCegLine(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, lightningCeg)
+	-- end
+	-- spSpawnCEG(flashCeg,x1,y1,z1,0,1,0,2,0)
+	-- spSpawnCEG(flashCeg,x2,y2,z2,0,1,0,2,0)
 end
 
 local function arcLightningOverPoint(x, z, arcLength, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
@@ -1292,10 +1293,17 @@ if not gadgetHandler:IsSyncedCode() then
 	  end
 	end
 
+	local function wormLightningToLuaUI(_, x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
+		if (Script.LuaUI('passWormLightning')) then
+			Script.LuaUI.passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
+		end
+	end
+
 	function gadget:Initialize()
 	  gadgetHandler:AddSyncAction('passWormInit', initToLuaUI)
 	  gadgetHandler:AddSyncAction('passWorm', wormToLuaUI)
 	  gadgetHandler:AddSyncAction('passSandUnit', sandUnitToLuaUI)
+	  gadgetHandler:AddSyncAction('passWormLightning', wormLightningToLuaUI)
 	end
 	
 end
