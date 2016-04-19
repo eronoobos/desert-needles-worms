@@ -92,17 +92,15 @@ local function doInit()
 		  	ignore=true
 		  end
 		end
-		if not ignore and (uDef.extractsMetal == 0) and (uDef.maxAcc < 0.01) then --if it's not a metal extractor and does not move, it is not valid
-		  if strFind(uDef.tooltip, " Mine") == nil then --if it's a mine, it is valid
+		if not ignore and (uDef.extractsMetal == 0) and (uDef.maxAcc < 0.01) and not uDef.needGeo and not strFind(uDef.tooltip, " Mine") then --if it's not a metal extractor and does not move, it is not valid
 			isNotValid[uDefID] = true
 			SendToUnsynced("passIsNotValid", uDefID)
---			spEcho(uDefID, 'sent from gadget')
+	--			spEcho(uDefID, 'sent from gadget')
 			if aiPresent then
 			  elmoMaxSize[uDefID] = mMax(uDef.xsize, uDef.zsize) * 8
 			  elmoMaxSize[uDefID] = elmoMaxSize[uDefID] - (elmoMaxSize[uDefID] % 32) + 32
 			end
 		  end
-		end
 	  end
 	
 	

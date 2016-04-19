@@ -180,6 +180,15 @@ local options = {
 	},
 
 	{
+		key	= 'sworm_eat_geo',
+		name	= 'Eats Geothermal Plants',
+		desc	= 'If checked, sand worms will eat geothermal power plants.',
+		type   = "bool",
+		section = '2_sworm_sect',
+		def    = 'false',
+	},
+
+	{
 		key	= 'sworm_eat_commander',
 		name	= 'Eats Commanders',
 		desc	= 'If checked, sand worms will eat commanders.',

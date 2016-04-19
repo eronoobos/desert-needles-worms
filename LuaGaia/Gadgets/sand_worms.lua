@@ -15,6 +15,7 @@ end
 -- options that will be set by map options
 local wormSpeed = 1.0 -- how much the worm's vector is multiplied by to produce a position each game frame. slightly randomized for each worm (+/- 10%)
 local wormEatMex = false -- will worms eat metal extractors?
+local wormEatGeo = false -- will worms eat geothermal plants?
 local wormEatCommander = false -- will worms eat commanders?
 local wormAggression = 5 -- translates into movementPerWormAnger and unitsPerWormAnger
 
@@ -37,6 +38,7 @@ local baseWormDuration = 90 -- how long will a worm chase something to eat befor
 local wormChaseTimeMod = 2 -- how much to multiply the as-the-crow-flies estimated time of arrival at target. modified by wormAnger
 local distancePerValue = 2000 -- how value converts to distance, to decide between close vs valuable targets
 local mexValue = -200 -- negative value = inaccuracy of targetting
+local geoValue = -250 -- negative value = inaccuracy of targetting
 local hoverValue = -300 -- negative value = inaccuracy of targetting
 local commanderValue = -100 -- negative value = inaccuracy of targetting
 local attackDelay = 22 -- delay between worm attacks
@@ -320,6 +322,11 @@ local function getSandUnitValues()
 			-- spEcho(uDef.name, uDef.humanName, "is mex")
 			vals[uDefID] = mexValue
 			if not wormEatMex then
+				inedible[uDefID] = true
+			end
+		elseif uDef.needGeo then
+			vals[uDefID] = geoValue
+			if not wormEatGeo then
 				inedible[uDefID] = true
 			end
 		elseif uDef.moveDef and uDef.moveDef.family == "hover" then
@@ -1129,6 +1136,7 @@ function gadget:Initialize()
 		movementPerWormAnger = 100000 / wormAggression
 		if mapOptions.sworm_worm_speed then wormSpeed = tonumber(mapOptions.sworm_worm_speed) end
 		if mapOptions.sworm_eat_mex == "1" then wormEatMex = true end
+		if mapOptions.sworm_eat_geo == "1" then wormEatGeo = true end
 		if mapOptions.sworm_eat_commander == "1" then wormEatCommander = true end
 		-- SendToUnsynced("passWormInit", evalFrequency, wormSpeed, 65) -- uncomment for showing worm positions with debug widget
 	end
@@ -1159,6 +1167,7 @@ function gadget:GameStart()
 	spEcho("sand worm aggression", wormAggression)
 	spEcho("sand worm base speed", wormSpeed)
 	spEcho("sand worms eat mex?", wormEatMex)
+	spEcho("sand worms eat geo?", wormEatGeo)
 	spEcho("sand worms eat commander?", wormEatCommander)
 end
 
