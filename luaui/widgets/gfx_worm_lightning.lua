@@ -10,10 +10,12 @@ function widget:GetInfo()
 	}
 end
 
-local timelineElementDuration = 0.1 -- in seconds
-local timelineMaxSize = 10
-local connectProbability = 0.2
+local timelineElementDuration = 5 -- in seconds
+local timelineMinSize = 3
+local timelineMaxSize = 12
+local connectProbability = 1
 local flashTex = "bitmaps/sworm_lightning_glow.png"
+local lightningTex = "bitmaps/sworm_lightning_gl.png"
 local flashSizeMult = 6
 
 local strikes = {}
@@ -66,6 +68,7 @@ local glBillboard = gl.Billboard
 local glTranslate = gl.Translate
 local glNormal = gl.Normal
 local glRotate = gl.Rotate
+local glTexCoord = gl.TexCoord
 
 local GL_LINE_STRIP = GL.LINE_STRIP
 local GL_TRIANGLE_STRIP = GL.TRIANGLE_STRIP
@@ -112,6 +115,15 @@ local function CirclePos(cx, cy, dist, angle)
   return x, y
 end
 
+local triCylPos = {}
+local triCylRot = twicePi / 3
+for i = 0, 3 do
+	local a = i * triCylRot
+	local x, z = CirclePos(0, 0, 1, a)
+	triCylPos[i] = {x=x, z=z}
+end
+local triCylRadiusPos = {}
+
 local function doLine3d(x1, y1, z1, x2, y2, z2)
     glVertex(x1, y1, z1)
     glVertex(x2, y2, z2)
@@ -121,29 +133,39 @@ local function doPoints2d(x, y)
 	glVertex(x, y)
 end
 
-local function doCylinder(r, h, p)
-	local rot = twicePi / p
-	local pos = {}
-	for a = 0, twicePi, rot do
-		local x, z = CirclePos(0, 0, r, a)
-		pos[#pos+1] = {x=x, z=z}
-		if a ~= 0 then
-			glVertex(x, 0, z)
-		end
+local function getTriCylPos(r, i)
+	if triCylRadiusPos[r] then return triCylRadiusPos[r][i].x, triCylRadiusPos[r][i].z, triCylPos[i].x, triCylPos[i].z end
+	triCylRadiusPos[r] = {}
+	for i = 0, 3 do
+		local p = triCylPos[i]
+		local x, z = p.x*r, p.z*r
+		triCylRadiusPos[r][i] = {x=x, z=z}
 	end
-	for i = 1, #pos do
-		local p = pos[i]
-		glVertex(p.x, 0, p.z)
-		glVertex(p.x, h, p.z)
+	return triCylRadiusPos[r][i].x, triCylRadiusPos[r][i].z, triCylPos[i].x, triCylPos[i].z
+end
+
+local function doTriCylinder(r, h)
+	-- for i = 1, 3 do
+	-- 	local x, z = getTriCylPos(r, i)
+	-- 	glVertex(x, 0, z)
+	-- end
+	-- local coords = { 0, 0.5, 1, 0}
+	for i = 0, 3 do
+		local x, z, px, pz = getTriCylPos(r, i)
+		-- glNormal(px, 1, pz)
+		-- glTexCoord(coords[i+1], 0)
+		glVertex(x, 0, z)
+		-- glTexCoord(coords[i+1], 1)
+		glVertex(x, h, z)
 	end
-	for i = 2, #pos do
-		local p = pos[i]
-		glVertex(p.x, h, p.z)
-	end
+	-- for i = 1, 3 do
+	-- 	local x, z = getTriCylPos(r, i)
+	-- 	glVertex(x, h, z)
+	-- end
 end
 
 local function getStrikeTimeline()
-	local n = mRandom(1, timelineMaxSize-1)
+	local n = mRandom(timelineMinSize-1, timelineMaxSize-1)
 	local elements = { 1.0 }
 	for i = 1, n do
 		local element = 0
@@ -173,17 +195,20 @@ local function drawSegment(x1, y1, z1, x2, y2, z2, r)
 	local zAxisAngle = mDeg(mAtan2(-distXZ, dy))
 	glRotate(zAxisAngle, 0, 0, 1)
 	local dist = mSqrt(dx*dx + dy*dy + dz*dz)
-	glBeginEnd(GL_TRIANGLE_STRIP, doCylinder, r, dist+(r/2), 3)
+	glBeginEnd(GL_TRIANGLE_STRIP, doTriCylinder, r, dist+(r/2), 3)
 	-- glLineWidth(2)
 	-- glColor(1, 0, 0, 1)
 	-- glBeginEnd(GL_LINE_STRIP, doLine3d, 0, 0, 0, 0, dist, 0)
 	glPopMatrix()
 end
 
-local function drawLightning(segments, radius)
-	for i = 1, #segments do
+local function drawLightning(segments, radius, cutoff)
+	local n = cutoff or #segments
+	for i = 1, n do
 		local seg = segments[i]
-		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, radius/seg.branch)
+		if not cutoff or seg.branch == 1 then
+			drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, radius/seg.branch)
+		end
 	end
 end
 
@@ -200,15 +225,17 @@ end
 local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	offsetMult = offsetMult or 0.4
 	generationNum = generationNum or 5
-	branchProb = branchProb or 0.25
+	branchProb = branchProb or 0.2
 	minOffsetMultXZ = minOffsetXZ or 0.05
 	minOffsetMultY = minOffsetY or 0.1
 	local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
 	local ymin = mMin(y1, y2)
 	local ymax = ymin
 	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}, branch = 1} }
+	local branchID = 1
 	for g = 1, generationNum do
 		local newSegmentList = {}
+		local branchSegmentList = {}
 		for s = #segmentList, 1, -1 do
 			local seg = tRemove(segmentList, s)
 			local midX = (seg.init.x + seg.term.x) / 2
@@ -225,13 +252,22 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid, branch=seg.branch}
 			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term, branch=seg.branch}
 			if mRandom() < branchProb then
+				local branch = seg.branch
+				if branch == 1 then
+					branchID = branchID + 1
+					branch = branchID
+				end
 				local angle = mAtan2(vz, vx)
 				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
 				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist/2, angle)
-				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz}, branch=seg.branch+1 }
+				branchSegmentList[#branchSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz}, branch=branch }
 			end
 		end
 		segmentList = newSegmentList
+		-- put branch segments at the end
+		for i = 1, #branchSegmentList do
+			segmentList[#segmentList+1] = branchSegmentList[i]
+		end
 	end
 	return segmentList, ymin, ymax
 end
@@ -254,6 +290,7 @@ local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, bran
 		-- baseColor = baseColor,
 		coreColor = coreColor,
 		glowColor = glowColor,
+		startDisplayList = glCreateList(drawLightning, segments, thickness*0.67, mCeil(#segments/2)),
 		coreDisplayList = glCreateList(drawLightning, segments, thickness),
 		glowDisplayList = glCreateList(drawLightning, segments, glowThickness),
 		flashDisplayList = glCreateList(drawLightningFlash, x, y, z, flashSize, flashColor),
@@ -298,12 +335,17 @@ function widget:Update(dt)
 				-- Spring.Echo(age, timeSlot, element)
 				if element == 1.0 then
 					s.flash = true
+					s.flashed = true
 				else
 					s.flash = false
 				end
 				s.glowColor[4] = element * 0.1
 				s.coreColor[4] = element
-				s.coreColor[2] = element * 0.5
+				if s.flashed then
+					s.coreColor[2] = element * 0.5
+				else
+					s.coreColor[2] = 0
+				end
 				s.timeSlot = timeSlot
 			end
 		end
@@ -317,10 +359,15 @@ function widget:DrawWorld()
 	glBlending("alpha_add")
 	for i = 1, #strikes do
 		local s = strikes[i]
-		glColor(s.glowColor)
-		glCallList(s.glowDisplayList)
-		glColor(s.coreColor)
-		glCallList(s.coreDisplayList)
+		if s.flashed then
+			glColor(s.glowColor)
+			glCallList(s.glowDisplayList)
+			glColor(s.coreColor)
+			glCallList(s.coreDisplayList)
+		else
+			glColor(s.coreColor)
+			glCallList(s.startDisplayList)
+		end
 	end
 	-- glPopMatrix()
 	glDepthTest(false)
