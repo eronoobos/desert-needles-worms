@@ -634,10 +634,8 @@ local function wormTargetting()
 					if adist < 0 then fortyFive = -quarterPi end
 					local newa = AngleAdd(cura, fortyFive)
 					w.tx, w.tz = CirclePos(w.x, w.z, u.dist, AngleAdd(cura, fortyFive))
-					-- spEcho("adist above quarterpi", fortyFive, newa)
 				else
 					w.tx, w.tz = CirclePos(w.x, w.z, u.dist, testa)
-					-- spEcho("adist below quarterpi, using testa")
 				end
 				-- w.tx, w.tz = u.ux, u.uz
 			end
@@ -715,18 +713,20 @@ end
 
 local function arcLightningOverPoint(x, z, arcLength, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
 	local angle1 = mRandom() * twicePi
-	local angle2 = AngleAdd(angle1, pi)
+	local angle2 = AngleAdd(angle1, pi + mRandom()*quarterPi - eighthPi)
 	local radius = arcLength / 2
-	local x1, z1 = CirclePos(x, z, radius, angle1)
-	local x2, z2 = CirclePos(x, z, radius, angle2)
+	local offset = mRandom() * radius * 0.25
+	local x1, z1 = CirclePos(x, z, radius-offset, angle1)
+	local x2, z2 = CirclePos(x, z, radius+offset, angle2)
 	signArcLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, lightningCeg, flashCeg, minOffsetMultXZ, minOffsetMultY)
 end
 
 local function wormBigSign(w)
-	local minArc = mCeil(w.size.radius * 8)
-	local maxArc = mCeil(w.size.radius * 10)
-	local sx, sz = CirclePos(w.x, w.z, mRandom(minArc, maxArc))
-	signArcLightning( w.x, w.z, sx, sz, nil, 6, nil, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	local minArc = mCeil(w.size.diameter * 2)
+	local maxArc = mCeil(w.size.diameter * 3)
+	-- local sx, sz = CirclePos(w.x, w.z, mRandom(minArc, maxArc))
+	-- signArcLightning( w.x, w.z, sx, sz, nil, 6, nil, "WORMSIGN_LIGHTNING", "WORMSIGN_FLASH" )
+	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
 	spPlaySoundFile(snd,0.75,w.x,y,w.z)
@@ -734,29 +734,24 @@ end
 
 local function wormMediumSign(w)
 	if not w then return end
-	local angle = mRandom() * twicePi
-	local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.5, angle)
-	local sx2, sz2 = CirclePos(w.x, w.z, w.size.diameter, angle)
-	signArcLightning( sx1, sz1, sx2, sz2 )
+	-- local angle = mRandom() * twicePi
+	-- local sx1, sz1 = CirclePos(w.x, w.z, w.size.radius*0.8, angle)
+	-- local sx2, sz2 = CirclePos(w.x, w.z, w.size.radius*1.2, AngleAdd(angle, pi + mRandom()*quarterPi - eighthPi))
+	-- signArcLightning( sx1, sz1, sx2, sz2 )
+	local minArc, maxArc = mCeil(w.size.diameter * 1.2), mCeil(w.size.diameter * 1.4)
+	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
-	spPlaySoundFile(snd,0.1,sx,sy,sz)
+	local y = spGetGroundHeight(w.x, w.z)
+	spPlaySoundFile(snd,0.1,w.x,y,w.z)
 end
 
-local function wormLittleSign(w, sx, sz)
-	if not w and not sx then return end
-	sx = sx or w.x
-	sz = sz or w.z
-	local minArc, maxArc
-	if w then
-		minArc = mCeil(w.size.radius)
-		maxArc = mCeil(w.size.diameter)
-	else
-		minArc = 24
-		maxArc = 96
-	end
-	arcLightningOverPoint( sx, sz, mRandom(minArc, maxArc) )
+local function wormLittleSign(w)
+	if not w then return end
+	local minArc, maxArc = mCeil(w.size.radius), mCeil(w.size.diameter)
+	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
-	spPlaySoundFile(snd,0.05,sx,sy,sz)
+	local y = spGetGroundHeight(w.x, w.z)
+	spPlaySoundFile(snd,0.05,w.x,y,w.z)
 end
 
 local function wormMoveUnderUnit(w)

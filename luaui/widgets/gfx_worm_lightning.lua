@@ -10,12 +10,11 @@ function widget:GetInfo()
 	}
 end
 
-local timelineElementDuration = 5 -- in seconds
+local timelineElementDuration = 0.075 -- in seconds
 local timelineMinSize = 3
 local timelineMaxSize = 12
-local connectProbability = 1
+local connectProbability = 0.25
 local flashTex = "bitmaps/sworm_lightning_glow.png"
-local lightningTex = "bitmaps/sworm_lightning_gl.png"
 local flashSizeMult = 6
 
 local strikes = {}
@@ -202,11 +201,10 @@ local function drawSegment(x1, y1, z1, x2, y2, z2, r)
 	glPopMatrix()
 end
 
-local function drawLightning(segments, radius, cutoff)
-	local n = cutoff or #segments
-	for i = 1, n do
+local function drawLightning(segments, radius, trunkOnly)
+	for i = 1, #segments do
 		local seg = segments[i]
-		if not cutoff or seg.branch == 1 then
+		if not trunkOnly or seg.branch == 1 then
 			drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, radius/seg.branch)
 		end
 	end
@@ -232,10 +230,8 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 	local ymin = mMin(y1, y2)
 	local ymax = ymin
 	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}, branch = 1} }
-	local branchID = 1
 	for g = 1, generationNum do
 		local newSegmentList = {}
-		local branchSegmentList = {}
 		for s = #segmentList, 1, -1 do
 			local seg = tRemove(segmentList, s)
 			local midX = (seg.init.x + seg.term.x) / 2
@@ -252,29 +248,34 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid, branch=seg.branch}
 			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term, branch=seg.branch}
 			if mRandom() < branchProb then
-				local branch = seg.branch
-				if branch == 1 then
-					branchID = branchID + 1
-					branch = branchID
-				end
 				local angle = mAtan2(vz, vx)
 				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
 				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist/2, angle)
-				branchSegmentList[#branchSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz}, branch=branch }
+				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz}, branch=seg.branch+1 }
 			end
 		end
 		segmentList = newSegmentList
-		-- put branch segments at the end
-		for i = 1, #branchSegmentList do
-			segmentList[#segmentList+1] = branchSegmentList[i]
-		end
 	end
 	return segmentList, ymin, ymax
 end
 
 local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
-	thickness = thickness or 1 -- actually radius
-	glowThickness = glowThickness or 3.5 -- actually radius
+	thickness = thickness or (0.75 + (mRandom() * 0.5)) -- actually radius
+	glowThickness = glowThickness or (thickness * 3.5) -- actually radius
+	if not generationNum then
+		local dx, dz = x2-x1, z2-z1
+		local dist = mSqrt(dx*dx + dz*dz)
+		-- Spring.Echo(dist)
+		if dist < 64 then
+			generationNum = 4
+		elseif dist < 128 then
+			generationNum = 5
+		elseif dist < 256 then
+			generationNum = 6
+		else
+			generationNum = 7
+		end
+	end
 	local segments, y1, y2 = getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	local first = segments[1].init
 	local last = segments[#segments].term
@@ -288,10 +289,11 @@ local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, bran
 	local flashSize = radius * flashSizeMult
 	local strike = {
 		-- baseColor = baseColor,
+		trunkColor = glowColor,
 		coreColor = coreColor,
 		glowColor = glowColor,
-		startDisplayList = glCreateList(drawLightning, segments, thickness*0.67, mCeil(#segments/2)),
-		coreDisplayList = glCreateList(drawLightning, segments, thickness),
+		coreDisplayList = glCreateList(drawLightning, segments, thickness*0.67),
+		trunkDisplayList = glCreateList(drawLightning, segments, thickness*1.33, true),
 		glowDisplayList = glCreateList(drawLightning, segments, glowThickness),
 		flashDisplayList = glCreateList(drawLightningFlash, x, y, z, flashSize, flashColor),
 		timer = spGetTimer(),
@@ -327,6 +329,7 @@ function widget:Update(dt)
 		if timeSlot ~= s.timeSlot then
 			if timeSlot > #s.timeline then
 				glDeleteList(s.coreDisplayList)
+				glDeleteList(s.trunkDisplayList)
 				glDeleteList(s.glowDisplayList)
 				glDeleteList(s.flashDisplayList)
 				tRemove(strikes, i)
@@ -342,7 +345,9 @@ function widget:Update(dt)
 				s.glowColor[4] = element * 0.1
 				s.coreColor[4] = element
 				if s.flashed then
-					s.coreColor[2] = element * 0.5
+					s.trunkColor[4] = element * 0.1
+					s.trunkColor[2] = element * 0.2
+					s.coreColor[2] = element
 				else
 					s.coreColor[2] = 0
 				end
@@ -359,14 +364,13 @@ function widget:DrawWorld()
 	glBlending("alpha_add")
 	for i = 1, #strikes do
 		local s = strikes[i]
+		glColor(s.glowColor)
+		glCallList(s.glowDisplayList)
+		glColor(s.coreColor)
+		glCallList(s.coreDisplayList)
 		if s.flashed then
-			glColor(s.glowColor)
-			glCallList(s.glowDisplayList)
-			glColor(s.coreColor)
-			glCallList(s.coreDisplayList)
-		else
-			glColor(s.coreColor)
-			glCallList(s.startDisplayList)
+			glColor(s.trunkColor)
+			glCallList(s.trunkDisplayList)
 		end
 	end
 	-- glPopMatrix()
@@ -386,6 +390,7 @@ function widget:Shutdown()
 	for i = #strikes, 1, -1 do
 		local s = strikes[i]
 		glDeleteList(s.coreDisplayList)
+		glDeleteList(s.trunkDisplayList)
 		glDeleteList(s.glowDisplayList)
 		glDeleteList(s.flashDisplayList)
 	end
