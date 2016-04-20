@@ -10,11 +10,11 @@ function widget:GetInfo()
 	}
 end
 
-local strikeDuration = 0.2 -- in seconds
-local flashAge = 0.1
-local flashEndAge = 0.15
+local timelineElementDuration = 0.1 -- in seconds
+local timelineMaxSize = 10
+local connectProbability = 0.2
 local flashTex = "bitmaps/sworm_lightning_glow.png"
-local flashSizeMult = 4
+local flashSizeMult = 6
 
 local strikes = {}
 
@@ -30,6 +30,7 @@ local mMax = math.max
 local mSqrt = math.sqrt
 local mAbs = math.abs
 local mDeg = math.deg
+local mCeil = math.ceil
 
 local pi = math.pi
 local twicePi = math.pi * 2
@@ -70,6 +71,15 @@ local GL_LINE_STRIP = GL.LINE_STRIP
 local GL_TRIANGLE_STRIP = GL.TRIANGLE_STRIP
 local GL_POINTS = GL.POINTS
 local GL_TRIANGLE_FAN = GL.TRIANGLE_FAN
+
+-- simple duplicate, does not handle nesting
+local function tDuplicate(sourceTable)
+	local duplicate = {}
+	for k, v in pairs(sourceTable) do
+		duplicate[k] = v
+	end
+	return duplicate
+end
 
 local function normalizeVector2d(vx, vy)
 	if vx == 0 and vy == 0 then return 0, 0 end
@@ -132,6 +142,24 @@ local function doCylinder(r, h, p)
 	end
 end
 
+local function getStrikeTimeline()
+	local n = mRandom(1, timelineMaxSize-1)
+	local elements = { 1.0 }
+	for i = 1, n do
+		local element = 0
+		if mRandom() < connectProbability then
+			element = 0.1 + (mRandom() * 0.4)
+		end
+		elements[#elements+1] = element
+	end
+	local timeline = {}
+	for i = 1, n+1 do
+		timeline[#timeline+1] = tRemove(elements, mRandom(#elements))
+		-- timeline[#timeline+1] = 0
+	end
+	return timeline
+end
+
 local function drawSegment(x1, y1, z1, x2, y2, z2, r)
 	glPushMatrix()
 	-- glLineWidth(4)
@@ -152,11 +180,10 @@ local function drawSegment(x1, y1, z1, x2, y2, z2, r)
 	glPopMatrix()
 end
 
-local function drawLightningDisplayList(segments, radius)
-	thickness = thickness or 0.75
+local function drawLightning(segments, radius)
 	for i = 1, #segments do
 		local seg = segments[i]
-		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, radius)
+		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, radius/seg.branch)
 	end
 end
 
@@ -173,13 +200,13 @@ end
 local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	offsetMult = offsetMult or 0.4
 	generationNum = generationNum or 5
-	branchProb = branchProb or 0.2
+	branchProb = branchProb or 0.25
 	minOffsetMultXZ = minOffsetXZ or 0.05
 	minOffsetMultY = minOffsetY or 0.1
 	local y1, y2 = spGetGroundHeight(x1, z1), spGetGroundHeight(x2, z2)
 	local ymin = mMin(y1, y2)
 	local ymax = ymin
-	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}} }
+	local segmentList = { {init = {x=x1,y=y1,z=z1}, term = {x=x2,y=y2,z=z2}, branch = 1} }
 	for g = 1, generationNum do
 		local newSegmentList = {}
 		for s = #segmentList, 1, -1 do
@@ -195,13 +222,13 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 			midY = mMax( spGetGroundHeight(midX,midZ), midY+mRandom(dist*minOffsetMultY,offMax) )
 			if midY > ymax then ymax = midY end
 			local mid = {x=midX, y=midY, z=midZ}
-			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid}
-			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term}
+			newSegmentList[#newSegmentList+1] = {init=seg.init, term=mid, branch=seg.branch}
+			newSegmentList[#newSegmentList+1] = {init=mid, term=seg.term, branch=seg.branch}
 			if mRandom() < branchProb then
 				local angle = mAtan2(vz, vx)
 				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
 				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist/2, angle)
-				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz} }
+				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz}, branch=seg.branch+1 }
 			end
 		end
 		segmentList = newSegmentList
@@ -210,25 +237,28 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 end
 
 local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
-	thickness = thickness or 0.75 -- actually radius
-	glowThickness = glowThickness or 3 -- actually radius
+	thickness = thickness or 1 -- actually radius
+	glowThickness = glowThickness or 3.5 -- actually radius
 	local segments, y1, y2 = getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	local first = segments[1].init
 	local last = segments[#segments].term
 	local r = mRandom()
-	local coreColor = { 0.5+(r*0.5), 0.5, 0.5+((1-r)*0.5), 0.1 }
-	local glowColor = { coreColor[1], 0, coreColor[3], 0.01 }
-	local flashColor = { coreColor[1], coreColor[2], coreColor[3], 0.25}
+	local baseColor = { 0.5+(r*0.5), 0.0, 0.5+((1-r)*0.5), 1.0 }
+	local coreColor = { baseColor[1], 0.5, baseColor[3], 0.1 }
+	local glowColor = { baseColor[1], 0, baseColor[3], 0.01 }
+	local flashColor = { baseColor[1], baseColor[2], baseColor[3], 0.5}
 	local radius = mMax( mAbs(x2-x1), mAbs(y2-y1), mAbs(z2-z1) ) / 2
 	local x, y, z = (x1+x2) / 2, (y1+y2) / 2, (z1+z2) / 2
 	local flashSize = radius * flashSizeMult
 	local strike = {
+		-- baseColor = baseColor,
 		coreColor = coreColor,
 		glowColor = glowColor,
-		coreDisplayList = glCreateList(drawLightningDisplayList, segments, thickness),
-		glowDisplayList = glCreateList(drawLightningDisplayList, segments, glowThickness),
+		coreDisplayList = glCreateList(drawLightning, segments, thickness),
+		glowDisplayList = glCreateList(drawLightning, segments, glowThickness),
 		flashDisplayList = glCreateList(drawLightningFlash, x, y, z, flashSize, flashColor),
 		timer = spGetTimer(),
+		timeline = getStrikeTimeline(),
 	}
 	strikes[#strikes+1] = strike
 end
@@ -255,19 +285,27 @@ function widget:Update(dt)
 	for i = #strikes, 1, -1 do
 		local s = strikes[i]
 		local age = spDiffTimers(cur, s.timer)
-		if age > strikeDuration then
-			glDeleteList(s.coreDisplayList)
-			glDeleteList(s.glowDisplayList)
-			glDeleteList(s.flashDisplayList)
-			tRemove(strikes, i)
-		elseif age > flashEndAge then
-			s.flash = false
-			s.glowColor[4] = 0.01
-			s.coreColor[4] = 0.1
-		elseif age >= flashAge then
-			s.flash = true
-			s.glowColor[4] = 0.1
-			s.coreColor[4] = 1.0
+		local timeSlot = mCeil(age / timelineElementDuration)
+		if timeSlot == 0 then timeSlot = 1 end
+		if timeSlot ~= s.timeSlot then
+			if timeSlot > #s.timeline then
+				glDeleteList(s.coreDisplayList)
+				glDeleteList(s.glowDisplayList)
+				glDeleteList(s.flashDisplayList)
+				tRemove(strikes, i)
+			else
+				local element = s.timeline[timeSlot]
+				-- Spring.Echo(age, timeSlot, element)
+				if element == 1.0 then
+					s.flash = true
+				else
+					s.flash = false
+				end
+				s.glowColor[4] = element * 0.1
+				s.coreColor[4] = element
+				s.coreColor[2] = element * 0.5
+				s.timeSlot = timeSlot
+			end
 		end
 	end
 end
