@@ -10,8 +10,9 @@ function widget:GetInfo()
 	}
 end
 
-local strikeDuration = 0.15 -- in seconds
-local flashDuration = 0.2
+local strikeDuration = 0.2 -- in seconds
+local flashAge = 0.1
+local flashEndAge = 0.15
 local flashTex = "bitmaps/sworm_lightning_glow.png"
 local flashSizeMult = 4
 
@@ -151,32 +152,21 @@ local function drawSegment(x1, y1, z1, x2, y2, z2, r)
 	glPopMatrix()
 end
 
-local function drawLightningDisplayList(segments, coreColor, glowColor, thickness, glowThickness)
+local function drawLightningDisplayList(segments, radius)
 	thickness = thickness or 0.75
-	glowThickness = glowThickness or 3
 	for i = 1, #segments do
 		local seg = segments[i]
-		-- glBlending("add")
-		glBlending("alpha_add")
-		glColor(glowColor)
-		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, glowThickness)
-		-- glBlending("add")
-		glColor(coreColor)
-		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, thickness)
-		glBlending("reset")
+		drawSegment(seg.init.x, seg.init.y, seg.init.z, seg.term.x, seg.term.y, seg.term.z, radius)
 	end
 end
 
-local function drawLightningFlash(s)
-	if not spIsSphereInView(s.x, s.y, s.z, s.radius) then return end
+local function drawLightningFlash(x, y, z, size, color)
 	glPushMatrix()
-	glBlending("alpha_add")
-	glColor(s.flashColor)
+	glColor(color)
 	glTexture(flashTex)
-	glTranslate(s.x, s.y, s.z)
+	glTranslate(x, y, z)
 	glBillboard()
-	glTexRect(-s.flashSize, -s.flashSize, s.flashSize, s.flashSize)
-	glBlending("reset")
+	glTexRect(-size, -size, size, size)
 	glPopMatrix()
 end
 
@@ -210,7 +200,7 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 			if mRandom() < branchProb then
 				local angle = mAtan2(vz, vx)
 				angle = AngleAdd(angle, (mRandom()*quarterPi)-eighthPi)
-				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist*0.35, angle)
+				local bx, bz = CirclePos(seg.init.x, seg.init.z, dist/2, angle)
 				newSegmentList[#newSegmentList+1] = { init=seg.init, term={x=bx,y=seg.init.y,z=bz} }
 			end
 		end
@@ -220,26 +210,24 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 end
 
 local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
+	thickness = thickness or 0.75 -- actually radius
+	glowThickness = glowThickness or 3 -- actually radius
 	local segments, y1, y2 = getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY)
 	local first = segments[1].init
 	local last = segments[#segments].term
 	local r = mRandom()
-	local coreColor = { 0.5+(r*0.5), 0.5, 0.5+((1-r)*0.5), 1 }
-	local glowColor = { coreColor[1], 0, coreColor[3], 0.1 }
-	local flashColor = { coreColor[1], coreColor[2], coreColor[3], 0.15}
+	local coreColor = { 0.5+(r*0.5), 0.5, 0.5+((1-r)*0.5), 0.1 }
+	local glowColor = { coreColor[1], 0, coreColor[3], 0.01 }
+	local flashColor = { coreColor[1], coreColor[2], coreColor[3], 0.25}
 	local radius = mMax( mAbs(x2-x1), mAbs(y2-y1), mAbs(z2-z1) ) / 2
+	local x, y, z = (x1+x2) / 2, (y1+y2) / 2, (z1+z2) / 2
+	local flashSize = radius * flashSizeMult
 	local strike = {
-		x = (x1+x2) / 2,
-		y = (y1+y2) / 2,
-		z = (z1+z2) / 2,
-		radius = radius,
-		flashSize = radius * flashSizeMult,
-		fx1=fx1, fy1=fy1, fz1=fz1,
-		fx2=fx2, fy2=fy2, fz2=fz2,
 		coreColor = coreColor,
 		glowColor = glowColor,
-		flashColor = flashColor,
-		displayList = glCreateList(drawLightningDisplayList, segments, coreColor, glowColor, thickness, glowThickness),
+		coreDisplayList = glCreateList(drawLightningDisplayList, segments, thickness),
+		glowDisplayList = glCreateList(drawLightningDisplayList, segments, glowThickness),
+		flashDisplayList = glCreateList(drawLightningFlash, x, y, z, flashSize, flashColor),
 		timer = spGetTimer(),
 	}
 	strikes[#strikes+1] = strike
@@ -267,11 +255,19 @@ function widget:Update(dt)
 	for i = #strikes, 1, -1 do
 		local s = strikes[i]
 		local age = spDiffTimers(cur, s.timer)
-		if age > flashDuration then
+		if age > strikeDuration then
+			glDeleteList(s.coreDisplayList)
+			glDeleteList(s.glowDisplayList)
+			glDeleteList(s.flashDisplayList)
 			tRemove(strikes, i)
-		elseif age > strikeDuration then
-			glDeleteList(s.displayList)
-			s.noStrike = true
+		elseif age > flashEndAge then
+			s.flash = false
+			s.glowColor[4] = 0.01
+			s.coreColor[4] = 0.1
+		elseif age >= flashAge then
+			s.flash = true
+			s.glowColor[4] = 0.1
+			s.coreColor[4] = 1.0
 		end
 	end
 end
@@ -280,18 +276,32 @@ function widget:DrawWorld()
 	if #strikes == 0 then return end
 	glDepthTest(true)
 	-- glPushMatrix()
+	glBlending("alpha_add")
 	for i = 1, #strikes do
 		local s = strikes[i]
-		if not s.noStrike then
-			glCallList(s.displayList)
-		end
+		glColor(s.glowColor)
+		glCallList(s.glowDisplayList)
+		glColor(s.coreColor)
+		glCallList(s.coreDisplayList)
 	end
 	-- glPopMatrix()
 	glDepthTest(false)
 	for i = 1, #strikes do
 		local s = strikes[i]
-		drawLightningFlash(s)
+		if s.flash then
+			glCallList(s.flashDisplayList)
+		end
 	end
 	glDepthTest(true)
+	glBlending("reset")
 	glColor(1, 1, 1, 0.5)
+end
+
+function widget:Shutdown()
+	for i = #strikes, 1, -1 do
+		local s = strikes[i]
+		glDeleteList(s.coreDisplayList)
+		glDeleteList(s.glowDisplayList)
+		glDeleteList(s.flashDisplayList)
+	end
 end
