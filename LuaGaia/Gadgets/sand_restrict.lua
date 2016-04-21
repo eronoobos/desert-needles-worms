@@ -15,7 +15,7 @@ local halfCellSize = cellSize / 2
 local sizeX = Game.mapSizeX 
 local sizeZ = Game.mapSizeZ
 local maxSlope = 0.25
-local buildSpacing = 32
+local buildSpacing = 16
 
 local wormConfig = VFS.Include('wormconfig/wormconfig.lua')
 local sandType = wormConfig.sandType
