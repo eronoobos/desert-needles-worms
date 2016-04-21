@@ -260,6 +260,7 @@ local function getLightningSegments(x1, z1, x2, z2, offsetMult, generationNum, b
 end
 
 local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, branchProb, minOffsetMultXZ, minOffsetMultY, thickness, glowThickness)
+	if not x1 or not z1 or not x2 or not z2 then return end
 	thickness = thickness or (0.75 + (mRandom() * 0.5)) -- actually radius
 	glowThickness = glowThickness or (thickness * 3.5) -- actually radius
 	if not generationNum then
