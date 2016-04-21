@@ -302,10 +302,6 @@ local function passWormLightning(x1, z1, x2, z2, offsetMult, generationNum, bran
 	strikes[#strikes+1] = strike
 end
 
-function widget:Initialize()
-	widgetHandler:RegisterGlobal("passWormLightning", passWormLightning)
-end
-
 function widget:GameFrame(gf)
 	local myTeamID = spGetLocalTeamID()
 	local x1 = spGetTeamRulesParam(myTeamID, "wormLightningX1")
