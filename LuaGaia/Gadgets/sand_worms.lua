@@ -729,7 +729,7 @@ local function wormBigSign(w)
 	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = thunderSnds[mRandom(#thunderSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
-	spPlaySoundFile(snd,0.75,w.x,y,w.z)
+	spPlaySoundFile(snd,1.5,w.x,y,w.z)
 end
 
 local function wormMediumSign(w)
@@ -742,7 +742,7 @@ local function wormMediumSign(w)
 	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = lightningMediumSnds[mRandom(#lightningMediumSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
-	spPlaySoundFile(snd,0.1,w.x,y,w.z)
+	spPlaySoundFile(snd,1.25,w.x,y,w.z)
 end
 
 local function wormLittleSign(w)
@@ -751,7 +751,7 @@ local function wormLittleSign(w)
 	arcLightningOverPoint( w.x, w.z, mRandom(minArc, maxArc) )
 	local snd = lightningLittleSnds[mRandom(#lightningLittleSnds)]
 	local y = spGetGroundHeight(w.x, w.z)
-	spPlaySoundFile(snd,0.05,w.x,y,w.z)
+	spPlaySoundFile(snd,1.0,w.x,y,w.z)
 end
 
 local function wormMoveUnderUnit(w)
